@@ -1,0 +1,842 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Círculo Cromático Interativo</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Lato:wght@400;700;900&display=swap">
+<style>
+/* Layout: palco quadrado com os discos empilhados à esquerda, painel de controle à direita; em telas estreitas o painel desce. */
+:root{
+  --bg:#f4f5f6; --card:#ffffff; --ink:#23272b; --ink-soft:#5b6670; --line:#dde1e5;
+  --petrol:#1E6C93; --petrol-soft:#e3eef4; --orange:#FF9900; --orange-ink:#1b1200;
+  --stage:#e9edf0; --focus:#1E6C93;
+  --font:'Lato',system-ui,-apple-system,'Segoe UI',sans-serif;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --bg:#15191c; --card:#1e2327; --ink:#e8ecef; --ink-soft:#9ba7b1; --line:#323a40;
+    --petrol:#5fb0d6; --petrol-soft:#1f3541; --orange:#FF9900; --orange-ink:#1b1200;
+    --stage:#2a3238; --focus:#5fb0d6; color-scheme:dark;
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#15191c; --card:#1e2327; --ink:#e8ecef; --ink-soft:#9ba7b1; --line:#323a40;
+  --petrol:#5fb0d6; --petrol-soft:#1f3541; --orange:#FF9900; --orange-ink:#1b1200;
+  --stage:#2a3238; --focus:#5fb0d6; color-scheme:dark;
+}
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--ink);font-family:var(--font);margin:0;
+  padding-block:20px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+.wrap{max-width:1180px;margin:0 auto}
+header{display:flex;flex-wrap:wrap;align-items:baseline;gap:6px 16px;margin-bottom:14px}
+h1{font-size:22px;font-weight:900;margin:0;letter-spacing:.2px;text-wrap:balance}
+.sub{color:var(--ink-soft);font-size:14px;margin:0}
+.tabs{display:flex;gap:6px;margin:0 0 14px;border-bottom:1px solid var(--line)}
+.tab{font:inherit;font-weight:700;font-size:14px;background:none;border:0;color:var(--ink-soft);padding:9px 14px;cursor:pointer;border-bottom:3px solid transparent;margin-bottom:-1px}
+.tab[aria-selected="true"]{color:var(--petrol);border-bottom-color:var(--petrol)}
+.tab:focus-visible,button:focus-visible,input:focus-visible,.row:focus-visible,.stage:focus-visible{outline:3px solid var(--focus);outline-offset:2px}
+.layout{display:grid;grid-template-columns:minmax(0,1fr) 380px;gap:18px;align-items:start}
+.card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:14px}
+.stage-card{padding:12px}
+@media (min-width:901px){
+  .layout{height:calc(100vh - 150px);min-height:480px;align-items:stretch}
+  .stage-card{align-self:start}
+  .panel{overflow-y:auto;overscroll-behavior:contain;padding-right:6px;scrollbar-gutter:stable}
+  .stage-card .stage{max-width:min(680px,calc(100vh - 250px))}
+}
+.status{display:flex;flex-wrap:wrap;justify-content:space-between;gap:4px 12px;font-size:13px;color:var(--ink-soft);margin:0 2px 10px;min-height:20px}
+.status b{color:var(--ink)}
+.stage{position:relative;width:100%;max-width:680px;margin:0 auto;aspect-ratio:1/1;background:var(--stage);border-radius:10px;overflow:hidden;touch-action:none;user-select:none;-webkit-user-select:none;cursor:grab}
+.stage.dragging{cursor:grabbing}
+.stage.sem-alvo{cursor:default}
+.disc{position:absolute;inset:0;width:100%;height:100%;max-width:none;pointer-events:none;transition:transform .22s ease;will-change:transform;-webkit-user-drag:none}
+.stage.dragging .disc{transition:none}
+.disc[hidden]{display:none!important}
+.hint{font-size:12.5px;color:var(--ink-soft);margin:10px 2px 0;text-align:center}
+.panel{display:flex;flex-direction:column;gap:14px}
+h2{font-size:13px;letter-spacing:.8px;text-transform:uppercase;color:var(--ink-soft);margin:0 0 8px;font-weight:900}
+.group{display:flex;flex-direction:column;gap:6px}
+.row{display:flex;align-items:center;gap:10px;padding:8px 10px;border:1px solid var(--line);border-radius:9px;background:var(--card);cursor:pointer;min-width:0}
+.row:hover{border-color:var(--petrol)}
+.row.sel{border-color:var(--petrol);background:var(--petrol-soft)}
+.row .nome{flex:1;min-width:0}
+.row .nome b{display:block;font-size:14px}
+.row .nome span{display:block;font-size:12px;color:var(--ink-soft);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.row .ang{font-size:12px;font-weight:700;color:var(--ink-soft);font-variant-numeric:tabular-nums;min-width:38px;text-align:right}
+.sw{position:relative;flex:none;width:40px;height:22px}
+.sw input{position:absolute;inset:0;width:100%;height:100%;opacity:0;margin:0;cursor:pointer}
+.sw i{position:absolute;inset:0;border-radius:11px;background:var(--line);transition:background .15s;pointer-events:none}
+.sw i::after{content:"";position:absolute;top:3px;left:3px;width:16px;height:16px;border-radius:50%;background:#fff;box-shadow:0 1px 2px rgba(0,0,0,.3);transition:transform .15s}
+.sw input:checked + i{background:var(--petrol)}
+.sw input:checked + i::after{transform:translateX(18px)}
+.sw input:focus-visible + i{outline:3px solid var(--focus);outline-offset:2px}
+.ctl{display:grid;gap:10px}
+.ctl .linha{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+.btn{font:inherit;font-weight:700;font-size:13px;border:1px solid var(--line);background:var(--card);color:var(--ink);border-radius:8px;padding:8px 11px;cursor:pointer}
+.btn:hover{border-color:var(--petrol);color:var(--petrol)}
+.btn.main{background:var(--orange);border-color:var(--orange);color:var(--orange-ink)}
+.btn.main:hover{filter:brightness(.95);color:var(--orange-ink)}
+.btn[disabled]{opacity:.45;cursor:not-allowed}
+input[type=range]{flex:1;min-width:120px;accent-color:var(--petrol)}
+.num{width:64px;font:inherit;font-size:14px;font-weight:700;padding:7px 8px;border:1px solid var(--line);border-radius:8px;background:var(--card);color:var(--ink);font-variant-numeric:tabular-nums}
+.chk{display:flex;align-items:center;gap:8px;font-size:13px;color:var(--ink-soft);cursor:pointer}
+.chk input{width:16px;height:16px;accent-color:var(--petrol)}
+.ajuda h3{font-size:15px;margin:16px 0 6px}
+.ajuda h3:first-child{margin-top:0}
+.ajuda p,.ajuda li{font-size:14px;line-height:1.55;color:var(--ink)}
+.ajuda ul{padding-left:20px;margin:6px 0}
+.cols2{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:14px}
+[hidden]{display:none!important}
+@media (max-width:900px){.layout{grid-template-columns:minmax(0,1fr)}}
+@media (prefers-reduced-motion:reduce){.disc,.sw i,.sw i::after{transition:none}}
+
+.esp{display:grid;gap:10px}
+.esp .topo{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.esp .amostra{width:56px;height:56px;border-radius:10px;border:1px solid var(--line);background:repeating-conic-gradient(#d9dde0 0 25%,#fff 0 50%) 0 0/12px 12px;position:relative;overflow:hidden;flex:none}
+.esp .amostra i{position:absolute;inset:0;display:block}
+.esp dl{margin:0;display:grid;grid-template-columns:auto 1fr;gap:5px 12px;font-size:13px}
+.esp dt{color:var(--ink-soft);font-weight:700}
+.esp dd{margin:0;font-variant-numeric:tabular-nums;font-weight:700;word-break:break-word}
+.esp .nota{font-size:12px;color:var(--ink-soft);margin:0}
+.btn[aria-pressed="true"]{background:var(--petrol);color:#fff;border-color:var(--petrol)}
+.stage.medindo{cursor:crosshair}
+.base-branca{position:absolute;left:50%;top:50%;width:82.5%;aspect-ratio:1/1;transform:translate(-50%,-50%);border-radius:50%;background:#fff;pointer-events:none;z-index:0}
+.row.fixo{cursor:default;opacity:.85}
+.row.fixo .trava{width:40px;text-align:center;font-size:15px;color:var(--ink-soft)}
+
+/* Aba de paleta por atmosfera */
+.pal-grid{display:grid;grid-template-columns:minmax(0,1fr) 340px;gap:18px;align-items:start}
+@media (max-width:900px){.pal-grid{grid-template-columns:minmax(0,1fr)}.pal-grid>.panel{order:-1}}
+.fib{display:flex;height:84px;border-radius:12px;overflow:hidden;border:1px solid var(--line)}
+.fib button{all:unset;box-sizing:border-box;display:flex;flex-direction:column;justify-content:flex-end;padding:8px;min-width:0;cursor:pointer;font-weight:900;font-size:15px;font-variant-numeric:tabular-nums;position:relative;transition:flex-basis .25s ease}
+.fib button:focus-visible{outline:3px solid var(--focus);outline-offset:-3px}
+.fib button span{font-size:11px;font-weight:700;opacity:.85;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.fib button.on{box-shadow:inset 0 0 0 3px rgba(255,255,255,.85),inset 0 0 0 5px rgba(0,0,0,.35)}
+.cards5{display:flex;flex-direction:column;gap:6px;margin-top:10px}
+.cor-card{border:1px solid var(--line);border-radius:10px;overflow:hidden;background:var(--card);display:flex;flex-direction:row;align-items:center;gap:8px;padding-right:8px}
+.cor-card.on{border-color:var(--petrol);box-shadow:0 0 0 2px var(--petrol-soft)}
+.cor-card .amo{align-self:stretch;width:46px;flex:none;cursor:pointer;border:0;padding:0}
+.cor-card .inf{padding:6px 0;display:grid;gap:1px;font-size:12.5px;flex:1;min-width:0}
+.cor-card .inf b{font-size:14px}
+.cor-card .inf small{color:var(--ink-soft);font-size:12px;font-variant-numeric:tabular-nums}
+.cor-card .acoes{display:flex;flex-direction:column;gap:4px}
+.cor-card .acoes .btn{padding:3px 8px;font-size:11.5px}
+.pal-det{margin-top:12px}
+.pal-det dl{margin:0;display:grid;grid-template-columns:auto 1fr;gap:5px 12px;font-size:13px}
+.pal-det dt{color:var(--ink-soft);font-weight:700}
+.pal-det dd{margin:0;font-weight:700;font-variant-numeric:tabular-nums;word-break:break-word}
+.sel-atm{font:inherit;font-size:15px;font-weight:700;padding:9px 10px;border:1px solid var(--line);border-radius:9px;background:var(--card);color:var(--ink);width:100%}
+.atm-desc{font-size:13px;color:var(--ink-soft);margin:6px 0 0}
+.chips{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}
+.chip{font-size:12px;font-weight:700;padding:3px 9px;border-radius:99px;background:var(--petrol-soft);color:var(--petrol)}
+.ctl-l{display:grid;grid-template-columns:90px 1fr 46px;gap:8px;align-items:center;font-size:13px;font-weight:700;margin-top:10px}
+.ctl-l output{text-align:right;font-variant-numeric:tabular-nums;color:var(--ink-soft)}
+.picker{margin-top:12px;border:1px solid var(--line);border-radius:12px;padding:12px;background:var(--card)}
+.picker[hidden]{display:none}
+.pk-grid{display:grid;grid-template-columns:repeat(12,minmax(0,1fr));gap:3px;margin-top:8px}
+.pk-grid button{all:unset;box-sizing:border-box;aspect-ratio:1/1;border-radius:5px;cursor:pointer;border:1px solid rgba(0,0,0,.12)}
+.pk-grid button:hover{outline:2px solid var(--ink)}
+.pk-grid button:focus-visible{outline:3px solid var(--focus)}
+.previa{width:100%;aspect-ratio:21/13;border-radius:12px;border:1px solid var(--line);display:block}
+
+.ajuda .intro{font-size:15px;margin:0 0 6px;max-width:75ch}
+.passo{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:20px;align-items:center;padding:20px 0;border-top:1px solid var(--line)}
+.passo:first-of-type{border-top:0}
+.passo h3{display:flex;align-items:center;gap:10px;margin:0 0 8px!important}
+.np{display:inline-flex;align-items:center;justify-content:center;width:26px;height:26px;border-radius:50%;background:var(--petrol);color:#fff;font-size:13px;font-weight:900;flex:none}
+.passo figure{margin:0 auto;max-width:520px;width:100%}
+.passo .duas figure{max-width:none}
+.passo img{width:100%;height:auto;display:block;border-radius:10px;border:1px solid var(--line);background:#fff}
+.passo figcaption{font-size:12.5px;color:var(--ink-soft);margin-top:6px;text-align:center}
+.passo .duas{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;align-items:start}
+@media (max-width:900px){.passo{grid-template-columns:minmax(0,1fr)}}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>Círculo Cromático Interativo</h1>
+  </header>
+
+  <div class="tabs" role="tablist">
+    <button class="tab" role="tab" id="t-circulo" aria-selected="true" aria-controls="p-circulo">Círculo</button>
+    <button class="tab" role="tab" id="t-ajuda" aria-selected="false" aria-controls="p-ajuda">Como usar</button>
+  </div>
+
+  <section id="p-circulo" role="tabpanel" aria-labelledby="t-circulo">
+    <div class="layout">
+      <div class="card stage-card">
+        <div class="status"><span id="st-alvo"></span><span id="st-ang"></span></div>
+        <div class="stage" id="stage" tabindex="0" role="img" aria-label="Círculo cromático com discos sobrepostos. Arraste para girar o disco selecionado, ou use as setas do teclado."></div>
+        <p class="hint">Arraste sobre o círculo para girar o disco selecionado. Setas do teclado giram de 15 em 15 graus, com Shift de 1 em 1, em qualquer ponto da tela fora de campos de texto.</p>
+      </div>
+
+      <div class="panel">
+        <div class="card paleta">
+          <h2>Paleta por atmosfera</h2>
+          <select class="sel-atm" id="atm" aria-label="Atmosfera desejada"></select>
+          <p class="atm-desc" id="atm-desc"></p>
+          <div class="chips" id="atm-chips"></div>
+          <label class="chk" style="margin-top:8px"><input type="checkbox" id="pal-sync" checked> Mostrar a harmonia no círculo</label>
+          <div class="fib" id="fib" role="group" aria-label="Proporção das cores da paleta" style="margin-top:10px"></div>
+          <div class="cards5" id="cards5"></div>
+          <div class="picker" id="picker" hidden>
+            <div style="display:flex;justify-content:space-between;align-items:center;gap:8px"><b id="pk-tit" style="font-size:14px">Trocar cor</b><button class="btn" id="pk-fechar">Fechar</button></div>
+            <p class="atm-desc" style="margin-top:4px">Linhas: cor cheia, tons claros do círculo e dois tons escuros. A cor escolhida fica travada.</p>
+            <div class="pk-grid" id="pk-grid"></div>
+          </div>
+          <div class="pal-det">
+            <div style="display:flex;gap:12px;align-items:center;margin:12px 0 8px">
+              <div id="pd-amo" style="width:44px;height:44px;border-radius:10px;border:1px solid var(--line);flex:none"></div>
+              <b id="pd-nome" style="font-size:14px">-</b>
+            </div>
+            <dl>
+              <dt>Hexadecimal</dt><dd id="pd-hex">-</dd>
+              <dt>RGB</dt><dd id="pd-rgb">-</dd>
+              <dt>RGB Web Safe</dt><dd id="pd-web">-</dd>
+              <dt>HSB</dt><dd id="pd-hsb">-</dd>
+              <dt>CMYK</dt><dd id="pd-cmyk">-</dd>
+              <dt>Pantone</dt><dd id="pd-pan">-</dd>
+            </dl>
+          </div>
+          <div class="ctl-l"><label for="sl-sat">Saturação</label><input type="range" id="sl-sat" min="-50" max="50" step="5" value="0"><output id="o-sat">0</output></div>
+          <div class="ctl-l"><label for="sl-luz">Luminosidade</label><input type="range" id="sl-luz" min="-30" max="30" step="5" value="0"><output id="o-luz">0</output></div>
+          <div style="display:flex;flex-wrap:wrap;gap:8px;margin-top:12px">
+            <button class="btn main" id="b-sugerir">Sugerir outra</button>
+            <button class="btn" id="b-restaurar">Restaurar atmosfera</button>
+            <button class="btn" id="b-perfil" hidden>Aplicar perfil da atmosfera</button>
+          </div>
+          <p class="atm-desc">"Sugerir outra" troca a dominante e a harmonia dentro da atmosfera, mantendo as cores travadas.</p>
+          <svg class="previa" id="previa" viewBox="0 0 21 13" role="img" aria-label="Retângulo de Fibonacci com espiral, preenchido com as cinco cores da paleta" style="margin-top:12px"></svg>
+        </div>
+
+        <div class="card ctl">
+          <h2>Disco selecionado</h2>
+          <div class="linha"><b id="ct-nome" style="font-size:15px">Nenhum</b></div>
+          <div class="linha">
+            <input type="range" id="ct-slider" min="0" max="359" step="1" value="0" aria-label="Ângulo do disco">
+            <input type="number" id="ct-num" class="num" min="0" max="359" step="1" value="0" aria-label="Ângulo em graus">
+          </div>
+          <div class="linha">
+            <button class="btn" id="b-menos">&minus;15°</button>
+            <button class="btn" id="b-mais">+15°</button>
+            <button class="btn" id="b-zero">Zerar</button>
+            <button class="btn" id="b-frente">Para frente</button>
+            <button class="btn" id="b-tras">Para trás</button>
+          </div>
+          <div class="linha">
+            <label for="op-slider" style="font-size:13px;font-weight:700">Opacidade</label>
+            <input type="range" id="op-slider" min="0" max="100" step="5" value="100" aria-label="Opacidade do disco em porcentagem">
+            <output id="op-val" class="num" style="display:inline-block;text-align:center">100%</output>
+          </div>
+          <label class="chk"><input type="checkbox" id="snap" checked> Encaixar a cada 15° ao arrastar</label>
+        </div>
+
+        <div class="card esp">
+          <h2>Espectrofotômetro</h2>
+          <div class="topo">
+            <button class="btn" id="esp-btn" aria-pressed="false">Ligar</button>
+            <span class="nota" id="esp-dica">Ligue e passe o mouse sobre o círculo para ler a cor. Clique para usá-la como base da paleta.</span>
+          </div>
+          <div class="topo">
+            <div class="amostra" aria-hidden="true"><i id="esp-cor"></i></div>
+            <b id="esp-status" style="font-size:13px">Desligado</b>
+          </div>
+          <dl id="esp-dados" aria-live="polite">
+            <dt>Hexadecimal</dt><dd id="e-hex">-</dd>
+            <dt>RGB</dt><dd id="e-rgb">-</dd>
+            <dt>RGB Web Safe</dt><dd id="e-web">-</dd>
+            <dt>HSB</dt><dd id="e-hsb">-</dd>
+            <dt>CMYK</dt><dd id="e-cmyk">-</dd>
+            <dt>Pantone</dt><dd id="e-pan">-</dd>
+          </dl>
+          <p class="nota">A leitura é a cor vista na tela, já com as sobreposições e a opacidade dos discos. CMYK é conversão simples do RGB e o Pantone é o mais próximo de uma lista reduzida, apenas uma referência.</p>
+        </div>
+
+        <div class="card">
+          <h2>Atalhos</h2>
+          <div class="linha" style="display:flex;flex-wrap:wrap;gap:8px">
+            <button class="btn main" id="a-base">Só a base</button>
+            <button class="btn" id="a-todos">Ligar todos</button>
+            <button class="btn" id="a-nenhum">Desligar todos</button>
+            <button class="btn" id="a-reset">Zerar rotações</button>
+          </div>
+        </div>
+
+        <div class="card">
+          <h2>Harmonias</h2>
+          <div class="group" id="g-harm"></div>
+        </div>
+        <div class="card">
+          <h2>Base e transparências</h2>
+          <div class="group" id="g-base"></div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section id="p-ajuda" role="tabpanel" aria-labelledby="t-ajuda" hidden>
+    <div class="card ajuda">
+      <p class="intro">Esta ferramenta é uma bancada de estudo de cor. À esquerda ficam os discos empilhados sobre uma base branca. À direita fica o painel de controles, que rola sozinho e não tira o círculo da tela. Siga os passos abaixo na ordem ou vá direto ao que precisa.</p>
+
+      <div class="passo">
+        <div>
+          <h3><span class="np">1</span>Conheça a tela</h3>
+          <p>O círculo mostra todos os discos ligados, um sobre o outro. No painel estão, de cima para baixo: a paleta por atmosfera, os controles do disco selecionado, o espectrofotômetro, os atalhos e as listas de discos.</p>
+          <p>As imagens deste guia foram feitas na própria ferramenta, então o que você vê aqui é o que vai ver em uso.</p>
+        </div>
+        <figure><img src="ajuda/visao.png" alt="Tela completa com o círculo à esquerda e o painel de controles à direita" loading="lazy"><figcaption>Círculo à esquerda e painel à direita.</figcaption></figure>
+      </div>
+
+      <div class="passo">
+        <div>
+          <h3><span class="np">2</span>Ligue, desligue e escolha o disco</h3>
+          <p>Cada disco tem uma chave. Ligue para ele aparecer no círculo e desligue para retirá-lo, como se tirasse uma folha da pilha.</p>
+          <p>Clique no nome do disco para selecioná-lo. O disco selecionado é o que gira e o que recebe os ajustes do painel.</p>
+          <p>As listas mostram o disco da frente no topo. No fim da lista de base está a "Base branca", com um cadeado: ela fica sempre no fundo e não pode ser alterada.</p>
+        </div>
+        <figure><img src="ajuda/lista.png" alt="Lista de discos com chaves de ligar e a base branca com cadeado" loading="lazy"><figcaption>Chaves de ligar e a base branca travada.</figcaption></figure>
+      </div>
+
+      <div class="passo">
+        <div>
+          <h3><span class="np">3</span>Gire o disco</h3>
+          <p>Com o disco selecionado, arraste sobre o círculo, use o controle deslizante, digite o ângulo ou use as setas do teclado: 15° por vez, ou 1° com Shift.</p>
+          <p>"Encaixar a cada 15°" faz o arraste parar nas posições das 12 cores. Desmarque para girar livremente.</p>
+          <p>As janelas recortadas do disco deixam ver as cores da base. Gire até a harmonia mostrar o que você quer estudar.</p>
+        </div>
+        <figure><img src="ajuda/girar-palco.png" alt="Disco Primárias girado em 60 graus sobre a base de cores" loading="lazy"><figcaption>Primárias girado em 60°.</figcaption></figure>
+      </div>
+
+      <div class="passo">
+        <div>
+          <h3><span class="np">4</span>Ordem, opacidade e transparentes</h3>
+          <p>"Para frente" e "Para trás" mudam a posição do disco na pilha, e a lista acompanha: "Para frente" sobe a linha, "Para trás" desce.</p>
+          <p>A barra de Opacidade vai de 0 a 100% para qualquer disco. Os dois discos transparentes começam em 60%.</p>
+          <p>O Transparente cinza, ligado sobre as cores, mostra o valor (o claro e o escuro) de cada uma. É um bom exercício de Luz e sombra: ordene as cores da mais clara à mais escura.</p>
+        </div>
+        <div class="duas">
+          <figure><img src="ajuda/controles.png" alt="Bloco Disco selecionado com ângulo, botões de ordem e opacidade" loading="lazy"><figcaption>Ângulo, ordem e opacidade.</figcaption></figure>
+          <figure><img src="ajuda/cinza.png" alt="Disco Análogas sob o Transparente cinza, mostrando o valor das cores" loading="lazy"><figcaption>Transparente cinza sobre as cores.</figcaption></figure>
+        </div>
+      </div>
+
+      <div class="passo">
+        <div>
+          <h3><span class="np">5</span>Leia as cores com o espectrofotômetro</h3>
+          <p>Clique em "Ligar" no bloco Espectrofotômetro e passe o mouse sobre o círculo. Ele mostra a cor que você está vendo naquele ponto, já com as sobreposições e a opacidade dos discos: hexadecimal, RGB, RGB Web Safe, HSB, CMYK e o Pantone mais próximo.</p>
+          <p>Atenção: o CMYK é uma conversão simples do RGB e o Pantone é aproximado, uma referência para conversar com a gráfica, não um valor de prova. Com o espectrofotômetro ligado, o arraste não gira os discos.</p>
+        </div>
+        <figure><img src="ajuda/espectro.png" alt="Bloco Espectrofotômetro com a leitura de uma cor amarela" loading="lazy"><figcaption>Leitura de uma cor sob o mouse.</figcaption></figure>
+      </div>
+
+      <div class="passo">
+        <div>
+          <h3><span class="np">6</span>Monte uma paleta por atmosfera</h3>
+          <p>No bloco "Paleta por atmosfera", escolha uma atmosfera, como Intimista, Sombrio, Alegre ou Noite. O app define a cor dominante, a harmonia e o perfil de saturação e luz, e distribui as cinco cores pela proporção de Fibonacci: 53%, 21%, 13%, 8% e 5%.</p>
+          <p>Passe o mouse sobre uma cor para ver seus dados. "Trocar" abre os 12 tons do círculo, com tons claros e escuros. "Travar" mantém a cor quando você muda a atmosfera ou pede outra sugestão.</p>
+          <p>"Saturação" e "Luminosidade" ajustam toda a paleta de uma vez. "Sugerir outra" troca a dominante e a harmonia dentro da atmosfera, e "Restaurar atmosfera" volta ao início.</p>
+          <p>Com "Mostrar a harmonia no círculo" marcado, o disco da harmonia liga sozinho e gira até a janela mostrar a cor dominante.</p>
+        </div>
+        <div class="duas">
+          <figure><img src="ajuda/paleta.png" alt="Bloco Paleta por atmosfera com a atmosfera Noite e as cinco cores" loading="lazy"><figcaption>Atmosfera Noite com as cinco cores.</figcaption></figure>
+          <figure><img src="ajuda/espiral.png" alt="Retângulo de Fibonacci com espiral dourada preenchido com as cores da paleta" loading="lazy"><figcaption>As cores dentro do desenho de Fibonacci.</figcaption></figure>
+        </div>
+      </div>
+
+      <div class="passo">
+        <div>
+          <h3><span class="np">7</span>Use uma cor do círculo como base</h3>
+          <p>Ligue o espectrofotômetro e clique numa cor do círculo. Ela vira a cor dominante da paleta, exatamente como foi clicada, e fica travada. A harmonia vem do disco ligado que estiver mais à frente, e as outras quatro cores herdam a saturação e a luz da cor clicada.</p>
+          <p>Para trocar o perfil, use "Aplicar perfil da atmosfera": as cores livres passam a seguir a atmosfera, e a cor clicada continua travada.</p>
+          <p>No exemplo ao lado, a atmosfera é Nostálgico, o disco é Análogas e o clique foi no #F2667B.</p>
+        </div>
+        <figure><img src="ajuda/clique.png" alt="Clique em uma cor rosa no círculo gerando uma paleta análoga no painel" loading="lazy"><figcaption>Do clique à paleta.</figcaption></figure>
+      </div>
+
+      <div class="passo">
+        <div>
+          <h3><span class="np">8</span>Atalhos</h3>
+          <ul>
+            <li>"Só a base" deixa apenas o disco Cores ligado.</li>
+            <li>"Ligar todos" e "Desligar todos" liga ou desliga tudo de uma vez.</li>
+            <li>"Zerar rotações" devolve todos os discos ao ângulo 0.</li>
+            <li>Setas do teclado giram o disco selecionado, e Shift muda o passo para 1°.</li>
+          </ul>
+        </div>
+        <div>
+          <h3><span class="np">9</span>Ideias de exercício</h3>
+          <ul>
+            <li><b>Luz e sombra:</b> ligue o Transparente cinza e ordene as cores do mais claro ao mais escuro.</li>
+            <li><b>Forma e proporção:</b> use os 53%, 21%, 13%, 8% e 5% como regra de área numa composição de cinco partes.</li>
+            <li><b>Perspectiva e espaço:</b> use "Cores frias" para o fundo e "Cores quentes" para a frente de uma paisagem.</li>
+            <li><b>Materiais e superfícies:</b> misture a paleta em aquarela ou pastel e compare com a leitura do espectrofotômetro.</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+  </section>
+</div>
+
+<script>
+(function(){
+  // Ordem da pilha: do disco de baixo (primeiro) para o de cima (último).
+  var DISCOS=[
+    {id:'cores',nome:'Cores',desc:'Círculo base com 12 cores e seus tons',grupo:'base',on:true},
+    {id:'transparente-cor',nome:'Transparente colorido',desc:'Círculo colorido translúcido para sobrepor',grupo:'base'},
+    {id:'transparente-cinza',nome:'Transparente cinza',desc:'Escala de cinzas translúcida, mostra o valor',grupo:'base'},
+    {id:'primarias',nome:'Primárias',desc:'Vermelho, amarelo e azul',grupo:'harm',on:true,sel:true},
+    {id:'secundarias',nome:'Secundárias',desc:'Laranja, verde e violeta',grupo:'harm'},
+    {id:'terciarias',nome:'Terciárias',desc:'Mistura de uma primária com uma secundária',grupo:'harm'},
+    {id:'analogas',nome:'Análogas',desc:'Cores vizinhas no círculo',grupo:'harm'},
+    {id:'complementares',nome:'Complementares',desc:'Cores opostas no círculo',grupo:'harm'},
+    {id:'semi-complementar',nome:'Semicomplementares',desc:'Uma cor e as vizinhas da sua oposta',grupo:'harm'},
+    {id:'triadicas',nome:'Triádicas',desc:'Três cores equidistantes',grupo:'harm'},
+    {id:'quadraticas',nome:'Quadráticas',desc:'Quatro cores, com proporção entre elas',grupo:'harm'},
+    {id:'tetraedricas',nome:'Tetraédricas',desc:'Quatro cores equidistantes',grupo:'harm'},
+    {id:'monocromia',nome:'Monocromia',desc:'Uma só cor em vários tons',grupo:'harm'},
+    {id:'quente',nome:'Cores quentes',desc:'Do amarelo ao vermelho',grupo:'harm'},
+    {id:'frio',nome:'Cores frias',desc:'Do verde ao roxo',grupo:'harm'}
+  ];
+  DISCOS.forEach(function(d){d.ang=0;d.on=!!d.on;d.op=/^transparente/.test(d.id)?60:100;});
+  var selId='primarias';
+  var esp={on:false,fixo:false,cv:null,N:720};
+
+  var $=function(i){return document.getElementById(i)};
+  var stage=$('stage');
+  var bb=document.createElement('div');bb.className='base-branca';bb.setAttribute('aria-hidden','true');stage.appendChild(bb);
+  DISCOS.forEach(function(d){
+    var im=document.createElement('img');
+    im.className='disc';im.alt='';im.draggable=false;im.src='discos/'+d.id+(/^transparente/.test(d.id)?'.png':'.svg');im.hidden=!d.on;
+    d.img=im;stage.appendChild(im);
+  });
+
+  function norm(a){a=a%360;return a<0?a+360:a}
+  function sel(){return DISCOS.find(function(d){return d.id===selId})}
+
+  function zOrder(){DISCOS.forEach(function(d,i){d.img.style.zIndex=i+1});}
+
+  function listas(){
+    var gb=$('g-base'),gh=$('g-harm');gb.innerHTML='';gh.innerHTML='';
+    DISCOS.slice().reverse().forEach(function(d){
+      var row=document.createElement('div');
+      row.className='row'+(d.id===selId?' sel':'');row.tabIndex=0;row.setAttribute('role','button');
+      row.setAttribute('aria-label','Selecionar disco '+d.nome);
+      var sw=document.createElement('label');sw.className='sw';
+      var cb=document.createElement('input');cb.type='checkbox';cb.checked=d.on;cb.setAttribute('aria-label','Ligar disco '+d.nome);
+      var tr=document.createElement('i');sw.appendChild(cb);sw.appendChild(tr);
+      var nm=document.createElement('div');nm.className='nome';
+      var b=document.createElement('b');b.textContent=d.nome;var s=document.createElement('span');s.textContent=d.desc;
+      nm.appendChild(b);nm.appendChild(s);
+      var ag=document.createElement('div');ag.className='ang';ag.textContent=d.ang+'°';d.angEl=ag;
+      row.appendChild(sw);row.appendChild(nm);row.appendChild(ag);
+      sw.addEventListener('click',function(e){e.stopPropagation()});
+      cb.addEventListener('change',function(){d.on=cb.checked;d.img.hidden=!d.on;if(d.on)selId=d.id;refresh();});
+      row.addEventListener('click',function(){selId=d.id;refresh();});
+      row.addEventListener('keydown',function(e){if(e.key==='Enter'||e.key===' '){e.preventDefault();selId=d.id;refresh();}});
+      (d.grupo==='base'?gb:gh).appendChild(row);
+      d.row=row;d.cb=cb;
+    });
+    var fx=document.createElement('div');fx.className='row fixo';
+    fx.innerHTML='<span class="trava" aria-hidden="true">&#128274;</span><div class="nome"><b>Base branca</b><span>Fixa, sempre no fundo, não pode ser alterada</span></div>';
+    gb.appendChild(fx);
+  }
+  // As listas mostram o disco da frente no topo, como em um painel de camadas.
+
+  function aplicar(d){d.img.style.opacity=d.op/100;d.img.style.transform='rotate('+d.ang+'deg)';if(d.angEl)d.angEl.textContent=d.ang+'°';}
+
+  function refresh(){
+    var d=sel();
+    DISCOS.forEach(function(x){x.row.classList.toggle('sel',x.id===selId);x.cb.checked=x.on;x.img.hidden=!x.on;aplicar(x);});
+    zOrder();
+    $('ct-nome').textContent=d.nome+(d.on?'':' (desligado)');
+    $('ct-slider').value=d.ang;$('ct-num').value=d.ang;
+    $('op-slider').value=d.op;$('op-val').textContent=d.op+'%';
+    var ligado=d.on;
+    ['ct-slider','ct-num','b-menos','b-mais','b-zero','op-slider'].forEach(function(i){$(i).disabled=!ligado});
+    stage.classList.toggle('sem-alvo',!ligado);
+    $('st-alvo').innerHTML=ligado?'Girando: <b>'+d.nome+'</b>':'Ligue o disco <b>'+d.nome+'</b> para girar';
+    $('st-ang').textContent=ligado?d.ang+'°':'';
+    var i=DISCOS.indexOf(d);$('b-frente').disabled=i===DISCOS.length-1;$('b-tras').disabled=i===0;
+  }
+
+  function setAng(a){var d=sel();if(!d.on)return;d.ang=Math.round(norm(a));refresh();}
+
+  // Rotação por arraste
+  var arr=null;
+  function angPtr(e){var r=stage.getBoundingClientRect();var cx=r.left+r.width/2,cy=r.top+r.height/2;return Math.atan2(e.clientY-cy,e.clientX-cx)*180/Math.PI;}
+  stage.addEventListener('pointerdown',function(e){
+    if(esp.on)return;var d=sel();if(!d.on)return;
+    arr={d:d,a0:angPtr(e),base:d.ang};stage.classList.add('dragging');
+    try{stage.setPointerCapture(e.pointerId)}catch(_){}
+    e.preventDefault();
+  });
+  stage.addEventListener('pointermove',function(e){
+    if(!arr)return;
+    var a=arr.base+(angPtr(e)-arr.a0);
+    if($('snap').checked)a=Math.round(a/15)*15;
+    arr.d.ang=Math.round(norm(a));
+    aplicar(arr.d);$('ct-slider').value=arr.d.ang;$('ct-num').value=arr.d.ang;$('st-ang').textContent=arr.d.ang+'°';
+  });
+  function fim(){if(!arr)return;arr=null;stage.classList.remove('dragging');refresh();}
+  stage.addEventListener('pointerup',fim);stage.addEventListener('pointercancel',fim);
+  function teclaSeta(e){
+    if(e.defaultPrevented||e.altKey||e.ctrlKey||e.metaKey)return;
+    if($('p-circulo').hidden)return;
+    var t=e.target,tag=t&&t.tagName;
+    if(tag==='INPUT'||tag==='SELECT'||tag==='TEXTAREA'||(t&&t.isContentEditable))return;
+    var d=sel();if(!d||!d.on)return;var p=e.shiftKey?1:15,h=false;
+    if(e.key==='ArrowRight'||e.key==='ArrowUp'){setAng(d.ang+p);h=true}
+    else if(e.key==='ArrowLeft'||e.key==='ArrowDown'){setAng(d.ang-p);h=true}
+    if(h)e.preventDefault();
+  }
+  document.addEventListener('keydown',teclaSeta);
+
+  $('op-slider').addEventListener('input',function(){var d=sel();d.op=+this.value;$('op-val').textContent=d.op+'%';aplicar(d);});
+  $('ct-slider').addEventListener('input',function(){setAng(+this.value)});
+  $('ct-num').addEventListener('change',function(){var v=parseInt(this.value,10);setAng(isNaN(v)?0:v)});
+  $('b-menos').addEventListener('click',function(){setAng(sel().ang-15)});
+  $('b-mais').addEventListener('click',function(){setAng(sel().ang+15)});
+  $('b-zero').addEventListener('click',function(){setAng(0)});
+  function mover(delta){
+    var i=DISCOS.indexOf(sel()),j=i+delta;if(j<0||j>=DISCOS.length)return;
+    var t=DISCOS.splice(i,1)[0];DISCOS.splice(j,0,t);listas();refresh();
+  }
+  $('b-frente').addEventListener('click',function(){mover(1)});
+  $('b-tras').addEventListener('click',function(){mover(-1)});
+  $('a-base').addEventListener('click',function(){DISCOS.forEach(function(d){d.on=d.id==='cores'});selId='cores';refresh();});
+  $('a-todos').addEventListener('click',function(){DISCOS.forEach(function(d){d.on=true});refresh();});
+  $('a-nenhum').addEventListener('click',function(){DISCOS.forEach(function(d){d.on=false});refresh();});
+  $('a-reset').addEventListener('click',function(){DISCOS.forEach(function(d){d.ang=0});refresh();});
+
+  // Abas
+  function aba(qual){
+    ['circulo','ajuda'].forEach(function(k){
+      var on=k===qual;$('p-'+k).hidden=!on;$('t-'+k).setAttribute('aria-selected',on);
+    });
+  }
+  $('t-circulo').addEventListener('click',function(){aba('circulo')});
+  $('t-ajuda').addEventListener('click',function(){aba('ajuda')});
+
+  // ===== Espectrofotômetro =====
+  var PANTONE=[
+   ['Yellow C','FEDD00'],['102 C','FCE300'],['109 C','FFD100'],['116 C','FFCD00'],['123 C','FFC72C'],['124 C','EAAA00'],['130 C','F2A900'],['137 C','FFA300'],['151 C','FF8200'],
+   ['021 C','FE5000'],['165 C','FF6A13'],['172 C','FA4616'],['Warm Red C','F9423A'],['485 C','DA291C'],['186 C','C8102E'],['199 C','D50032'],['1788 C','EE2737'],['192 C','E4002B'],
+   ['Rubine Red C','CE0058'],['213 C','E31C79'],['219 C','DA1884'],['Rhodamine Red C','E10098'],['Purple C','BB29BB'],['2592 C','9B26B6'],['Violet C','440099'],['267 C','5F259F'],
+   ['Reflex Blue C','001489'],['286 C','0033A0'],['2728 C','0047BB'],['293 C','003DA5'],['300 C','005EB8'],['Process Blue C','0085CA'],['2995 C','00A3E0'],['306 C','00B5E2'],['319 C','2DC6D6'],
+   ['326 C','00B2A9'],['Green C','00AB84'],['347 C','009A44'],['354 C','00B140'],['361 C','43B02A'],['368 C','78BE20'],['375 C','97D700'],['382 C','C4D600'],['389 C','D0DF00'],
+   ['7401 C','F5E1A4'],['7402 C','F3D54E'],['155 C','F5D5A5'],['169 C','FFAA99'],['182 C','F9BFD1'],['2563 C','C4A4D6'],['2708 C','C8D1F0'],['290 C','B9D9EB'],['317 C','C8EAEA'],['331 C','BDE7C9'],['358 C','AFD58F'],
+   ['Cool Gray 1 C','D9D9D6'],['Cool Gray 3 C','C8C9C7'],['Cool Gray 5 C','B1B3B3'],['Cool Gray 7 C','97999B'],['Cool Gray 9 C','75787B'],['Cool Gray 11 C','53565A'],['Black C','2D2926'],['White','FFFFFF'],
+   ['Warm Gray 1 C','D7D2CB'],['Warm Gray 5 C','ACA39A'],['Warm Gray 9 C','83786F'],['7527 C','D6D2C4'],['4625 C','4F2C1D'],['476 C','4E3629'],['469 C','603D20']
+  ];
+  function srgbLin(v){v/=255;return v<=0.04045?v/12.92:Math.pow((v+0.055)/1.055,2.4)}
+  function toLab(r,g,b){
+    var R=srgbLin(r),G=srgbLin(g),B=srgbLin(b);
+    var X=(R*0.4124+G*0.3576+B*0.1805)/0.95047,Y=(R*0.2126+G*0.7152+B*0.0722),Z=(R*0.0193+G*0.1192+B*0.9505)/1.08883;
+    var f=function(t){return t>0.008856?Math.cbrt(t):7.787*t+16/116};
+    return [116*f(Y)-16,500*(f(X)-f(Y)),200*(f(Y)-f(Z))];
+  }
+  PANTONE.forEach(function(p){var h=p[1];p.rgb=[parseInt(h.slice(0,2),16),parseInt(h.slice(2,4),16),parseInt(h.slice(4,6),16)];p.lab=toLab(p.rgb[0],p.rgb[1],p.rgb[2]);});
+  function pantoneMaisProximo(r,g,b){
+    var L=toLab(r,g,b),best=null,bd=1e9;
+    PANTONE.forEach(function(p){var d=Math.hypot(L[0]-p.lab[0],L[1]-p.lab[1],L[2]-p.lab[2]);if(d<bd){bd=d;best=p}});
+    return {nome:best.name||best[0],hex:best[1],de:bd};
+  }
+  var hex2=function(n){return ('0'+n.toString(16)).slice(-2).toUpperCase()};
+  function converter(r,g,b){
+    var mx=Math.max(r,g,b),mn=Math.min(r,g,b),d=mx-mn,h=0;
+    if(d){if(mx===r)h=((g-b)/d)%6;else if(mx===g)h=(b-r)/d+2;else h=(r-g)/d+4;h*=60;if(h<0)h+=360;}
+    var sat=mx?d/mx*100:0,bri=mx/255*100;
+    var rr=r/255,gg=g/255,bb=b/255,k=1-Math.max(rr,gg,bb),c=0,m=0,y=0;
+    if(k<1){c=(1-rr-k)/(1-k);m=(1-gg-k)/(1-k);y=(1-bb-k)/(1-k);}
+    var ws=[r,g,b].map(function(v){return Math.round(v/51)*51});
+    var pan=pantoneMaisProximo(r,g,b);
+    return {
+      hex:'#'+hex2(r)+hex2(g)+hex2(b),
+      rgb:r+', '+g+', '+b,
+      web:'#'+hex2(ws[0])+hex2(ws[1])+hex2(ws[2])+' ('+ws.join(', ')+')',
+      hsb:Math.round(h)+'°, '+Math.round(sat)+'%, '+Math.round(bri)+'%',
+      cmyk:Math.round(c*100)+', '+Math.round(m*100)+', '+Math.round(y*100)+', '+Math.round(k*100),
+      pan:'Pantone '+pan.nome+' (#'+pan.hex+')'+(pan.de>12?' · aproximado':'')
+    };
+  }
+  function prepararCanvas(){
+    if(esp.cv)return true;
+    try{
+      esp.cv={};
+      DISCOS.forEach(function(d){
+        var c=document.createElement('canvas');c.width=c.height=esp.N;
+        var x=c.getContext('2d',{willReadFrequently:true});x.drawImage(d.img,0,0,esp.N,esp.N);
+        esp.cv[d.id]=x;
+      });
+      return true;
+    }catch(err){esp.cv=null;return false}
+  }
+  function amostrar(fx,fy){
+    var A=0,R=0,G=0,B=0; // composição de baixo para cima, canais pré-multiplicados
+    if(Math.hypot(fx-0.5,fy-0.5)<=0.4125){A=1;R=G=B=255;}
+    for(var i=0;i<DISCOS.length;i++){
+      var d=DISCOS[i];if(!d.on)continue;
+      var th=-d.ang*Math.PI/180,dx=fx-0.5,dy=fy-0.5;
+      var u=(dx*Math.cos(th)-dy*Math.sin(th)+0.5)*esp.N,v=(dx*Math.sin(th)+dy*Math.cos(th)+0.5)*esp.N;
+      if(u<0||v<0||u>=esp.N||v>=esp.N)continue;
+      var px=esp.cv[d.id].getImageData(Math.floor(u),Math.floor(v),1,1).data;
+      var a=px[3]/255*(d.op/100);if(a<=0)continue;
+      R=px[0]*a+R*(1-a);G=px[1]*a+G*(1-a);B=px[2]*a+B*(1-a);A=a+A*(1-a);
+    }
+    if(A<0.5)return null;
+    return [Math.round(R/A),Math.round(G/A),Math.round(B/A)];
+  }
+  function mostrar(c){
+    var ids=['e-hex','e-rgb','e-web','e-hsb','e-cmyk','e-pan'];
+    if(!c){ids.forEach(function(i){$(i).textContent='-'});$('esp-cor').style.background='transparent';return;}
+    var o=converter(c[0],c[1],c[2]);
+    $('e-hex').textContent=o.hex;$('e-rgb').textContent=o.rgb;$('e-web').textContent=o.web;
+    $('e-hsb').textContent=o.hsb;$('e-cmyk').textContent=o.cmyk;$('e-pan').textContent=o.pan;
+    $('esp-cor').style.background='rgb('+c.join(',')+')';
+  }
+  function statusEsp(t){$('esp-status').textContent=t}
+  function leitura(e){
+    var r=stage.getBoundingClientRect();
+    var fx=(e.clientX-r.left)/r.width,fy=(e.clientY-r.top)/r.height;
+    if(fx<0||fy<0||fx>1||fy>1)return;
+    var c=amostrar(fx,fy);mostrar(c);statusEsp(c?'Lendo':'Fora dos discos');
+  }
+  $('esp-btn').addEventListener('click',function(){
+    esp.on=!esp.on;esp.fixo=false;
+    if(esp.on&&!prepararCanvas()){esp.on=false;statusEsp('Este navegador bloqueou a leitura das cores');return;}
+    this.setAttribute('aria-pressed',esp.on);this.textContent=esp.on?'Desligar':'Ligar';
+    stage.classList.toggle('medindo',esp.on);
+    statusEsp(esp.on?'Passe o mouse sobre o círculo':'Desligado');
+    if(!esp.on)mostrar(null);
+  });
+  stage.addEventListener('pointermove',function(e){if(esp.on&&!esp.fixo)leitura(e)});
+  stage.addEventListener('click',function(e){
+    if(!esp.on)return;
+    var r=stage.getBoundingClientRect();
+    var c=amostrar((e.clientX-r.left)/r.width,(e.clientY-r.top)/r.height);
+    if(!c){statusEsp('Clique dentro dos discos para escolher uma cor');return;}
+    mostrar(c);usarComoBase(c);statusEsp('Cor enviada como base da paleta');
+  });
+  // mudanças nos discos invalidam a leitura fixada
+  
+  // ===== Paleta por atmosfera (proporção de Fibonacci) =====
+  var MATIZ=[
+    {n:'Amarelo',h:'FFE900'},{n:'Amarelo-verde',h:'8BD03B'},{n:'Verde',h:'4EBE4E'},{n:'Verde-azul',h:'4CB7D3'},
+    {n:'Azul',h:'3E76C0'},{n:'Azul-roxo',h:'374DA6'},{n:'Roxo',h:'6142A3'},{n:'Roxo-vermelho',h:'BA2198'},
+    {n:'Vermelho',h:'EF2C34'},{n:'Vermelho-laranja',h:'F36F28'},{n:'Laranja',h:'F79421'},{n:'Laranja-amarelo',h:'F9BC1E'}
+  ];
+  var PCT=[53,21,13,8,5];
+  var HARM={
+    analoga:{nome:'Análoga',s:[[0,0,1],[1,.06,1],[-1,-.06,1],[2,.14,.9],[-2,-.12,1]]},
+    complementar:{nome:'Complementar',s:[[0,0,1],[6,0,1],[0,.18,.8],[6,-.14,1],[1,.1,1]]},
+    triadica:{nome:'Triádica',s:[[0,0,1],[4,0,1],[8,0,1],[0,.2,.75],[4,-.14,1]]},
+    divida:{nome:'Complementar dividida',s:[[0,0,1],[5,.12,1],[7,.2,1],[0,.15,.8],[5,-.12,1]]},
+    monocromia:{nome:'Monocromia',s:[[0,0,1],[0,.14,1],[0,-.12,1],[0,.28,.7],[0,-.24,1]]}
+  };
+  var ATM=[
+    {id:'intimista',nome:'Intimista',dom:[9,10,8],harm:['analoga'],sat:.75,luz:.38,esp:1,txt:'Quentes avermelhados e baixa luz, como um ambiente fechado e acolhedor.'},
+    {id:'alegre',nome:'Alegre',dom:[0,11,10],harm:['triadica','analoga'],sat:1.1,luz:.55,esp:1,txt:'Amarelo saturado e luminoso, com cores primárias vivas ao redor.'},
+    {id:'vibrante',nome:'Vibrante',dom:[10,8,0],harm:['complementar','triadica'],sat:1.15,luz:.5,esp:1.1,txt:'Saturação máxima e contraste entre opostos, para energia e movimento.'},
+    {id:'ensolarado',nome:'Ensolarado',dom:[11,0,10],harm:['analoga'],sat:1,luz:.62,esp:1,txt:'Quentes claros e luminosos, como luz de fim de manhã.'},
+    {id:'outonal',nome:'Outonal',dom:[10,9,11],harm:['analoga'],sat:.55,luz:.42,esp:1,txt:'Laranjas e terrosos dessaturados, de luz média e baixa.'},
+    {id:'sombrio',nome:'Sombrio',dom:[5,6,4],harm:['analoga','monocromia'],sat:.45,luz:.18,esp:.8,txt:'Frios dessaturados com valores muito escuros, que pesam e fecham o espaço.'},
+    {id:'noite',nome:'Noite',dom:[5,4,6],harm:['divida'],sat:.8,luz:.22,esp:1.5,txt:'Azul violeta escuro, com um acento quente que funciona como luz na escuridão.'},
+    {id:'triste',nome:'Triste',dom:[4,3,5],harm:['monocromia','analoga'],sat:.4,luz:.35,esp:1,txt:'Azuis dessaturados e de valor médio baixo, como o período azul de Picasso.'},
+    {id:'nostalgico',nome:'Nostálgico',dom:[2,1,3],harm:['analoga','complementar'],sat:.35,luz:.55,esp:1,txt:'Verdes acinzentados e tons desbotados, com um toque de rosa antigo na oposição.'},
+    {id:'sereno',nome:'Sereno',dom:[3,4,2],harm:['analoga'],sat:.55,luz:.72,esp:.9,txt:'Verdes azulados suaves e claros, com poucos contrastes.'},
+    {id:'misterioso',nome:'Misterioso',dom:[6,5,7],harm:['triadica','analoga'],sat:.6,luz:.25,esp:1.2,txt:'Roxos escuros com acentos fora do tom, para criar estranheza.'},
+    {id:'dramatico',nome:'Dramático',dom:[8,7,9],harm:['complementar'],sat:1.05,luz:.38,esp:1.7,txt:'Vermelho forte e oposto verde, com extremos de claro e escuro.'},
+    {id:'romantico',nome:'Romântico',dom:[7,8,6],harm:['analoga'],sat:.75,luz:.68,esp:1,txt:'Rosas e roxos avermelhados de luz média alta.'},
+    {id:'onirico',nome:'Onírico',dom:[6,5,7],harm:['analoga'],sat:.55,luz:.82,esp:.8,txt:'Violetas e azuis em tons pastel, leves e flutuantes.'}
+  ];
+  var PAL={atm:ATM[0],dom:0,harm:'analoga',slots:[],satOff:0,luzOff:0,aberto:-1,sel:0,base:null};
+  var hexTo=function(h){return [parseInt(h.slice(0,2),16),parseInt(h.slice(2,4),16),parseInt(h.slice(4,6),16)]};
+  var clamp01=function(v){return Math.max(0,Math.min(1,v))};
+  function rgb2hsl(r,g,b){r/=255;g/=255;b/=255;var mx=Math.max(r,g,b),mn=Math.min(r,g,b),l=(mx+mn)/2,h=0,sa=0,d=mx-mn;
+    if(d){sa=l>.5?d/(2-mx-mn):d/(mx+mn);if(mx===r)h=((g-b)/d+(g<b?6:0));else if(mx===g)h=(b-r)/d+2;else h=(r-g)/d+4;h*=60;}
+    return [h,sa,l];}
+  function hsl2hex(h,sa,l){var c=(1-Math.abs(2*l-1))*sa,x=c*(1-Math.abs((h/60)%2-1)),m=l-c/2,r=0,g=0,b=0;
+    if(h<60){r=c;g=x}else if(h<120){r=x;g=c}else if(h<180){g=c;b=x}else if(h<240){g=x;b=c}else if(h<300){r=x;b=c}else{r=c;b=x}
+    return [r+m,g+m,b+m].map(function(v){return hex2(Math.round(clamp01(v)*255))}).join('');}
+  function gerarSlot(i){
+    var a=PAL.atm,sl=HARM[PAL.harm].s[i];
+    var idx=(((PAL.dom+sl[0])%12)+12)%12;
+    var base=rgb2hsl.apply(null,hexTo(MATIZ[idx].h));
+    if(PAL.base){
+      // herda matiz exata, saturação e luz da cor clicada
+      var h0=rgb2hsl.apply(null,hexTo(MATIZ[PAL.dom].h))[0];
+      var hh=((base[0]+(PAL.base.h-h0))%360+360)%360;
+      var s2=clamp01(PAL.base.s*sl[2]+PAL.satOff/100);
+      var l2=Math.max(.06,Math.min(.95,PAL.base.l+sl[1]*a.esp+PAL.luzOff/100));
+      return {hex:hsl2hex(hh,s2,l2),idx:idx};
+    }
+    var sa=clamp01(base[1]*a.sat*sl[2]+PAL.satOff/100);
+    var l=Math.max(.06,Math.min(.95,a.luz+sl[1]*a.esp+PAL.luzOff/100));
+    return {hex:hsl2hex(base[0],sa,l),idx:idx};
+  }
+  function gerarTudo(){
+    for(var i=0;i<5;i++){
+      var old=PAL.slots[i];
+      if(old&&old.locked)continue;
+      var g=gerarSlot(i);PAL.slots[i]={hex:g.hex,idx:g.idx,locked:false};
+    }
+  }
+  function lumin(h){var c=hexTo(h);return .2126*srgbLin(c[0])+.7152*srgbLin(c[1])+.0722*srgbLin(c[2])}
+  function tinta(h){return lumin(h)>.38?'#1b1f23':'#ffffff'}
+  function nomeCor(sl){
+    var l=rgb2hsl.apply(null,hexTo(sl.hex))[2],n=MATIZ[sl.idx].n;
+    return n+(l>.75?' claro':l<.28?' escuro':'');
+  }
+  function desenharPaleta(){
+    var fib=$('fib');fib.innerHTML='';
+    PAL.slots.forEach(function(sl,i){
+      var b=document.createElement('button');b.type='button';b.style.flex=PCT[i]+' 1 0';b.style.background='#'+sl.hex;b.style.color=tinta(sl.hex);
+      b.className=i===PAL.sel?'on':'';
+      b.innerHTML=PCT[i]+'%<span>'+(PCT[i]>=13?nomeCor(sl):'')+'</span>';
+      b.setAttribute('aria-label',nomeCor(sl)+', '+PCT[i]+' por cento');
+      b.addEventListener('mouseenter',function(){detalhe(i)});b.addEventListener('focus',function(){detalhe(i)});
+      b.addEventListener('click',function(){PAL.sel=i;detalhe(i);desenharPaleta()});
+      fib.appendChild(b);
+    });
+    var cs=$('cards5');cs.innerHTML='';
+    PAL.slots.forEach(function(sl,i){
+      var c=document.createElement('div');c.className='cor-card'+(i===PAL.sel?' on':'');
+      var amo=document.createElement('button');amo.type='button';amo.className='amo';amo.style.background='#'+sl.hex;amo.setAttribute('aria-label','Trocar a cor '+nomeCor(sl));
+      amo.addEventListener('mouseenter',function(){detalhe(i)});
+      amo.addEventListener('click',function(){abrirPicker(i)});
+      var inf=document.createElement('div');inf.className='inf';
+      var pan=pantoneMaisProximo.apply(null,hexTo(sl.hex));
+      inf.innerHTML='<b>'+PCT[i]+'% '+nomeCor(sl)+'</b><small>#'+sl.hex+'</small><small>Pantone '+pan.nome+'</small>';
+      var ac=document.createElement('div');ac.className='acoes';
+      var bt=document.createElement('button');bt.type='button';bt.className='btn';bt.textContent=sl.locked?'Travada':'Travar';bt.setAttribute('aria-pressed',sl.locked);
+      bt.addEventListener('click',function(){sl.locked=!sl.locked;desenharPaleta()});
+      var bs=document.createElement('button');bs.type='button';bs.className='btn';bs.textContent='Trocar';
+      bs.addEventListener('click',function(){abrirPicker(i)});
+      ac.appendChild(bt);ac.appendChild(bs);
+      c.appendChild(amo);c.appendChild(inf);c.appendChild(ac);c.addEventListener('mouseenter',function(){detalhe(i)});
+      cs.appendChild(c);
+    });
+    // prévia: retângulo de Fibonacci (13, 8, 5, 3, 2, 1, 1) com a espiral
+    var h=function(i){return '#'+PAL.slots[i].hex};
+    var q=function(x,y,w,i,r){return '<rect x="'+x+'" y="'+y+'" width="'+w+'" height="'+w+'" fill="'+h(i)+'"/>'};
+    var tx=function(x,y,i,t,sz){return '<text x="'+x+'" y="'+y+'" font-size="'+sz+'" font-weight="900" text-anchor="middle" dominant-baseline="central" fill="'+tinta(PAL.slots[i].hex)+'" font-family="Lato,Arial,sans-serif">'+t+'</text>'};
+    var arco='M0 13A13 13 0 0 1 13 0A8 8 0 0 1 21 8A5 5 0 0 1 16 13A3 3 0 0 1 13 10A2 2 0 0 1 15 8A1 1 0 0 1 16 9A1 1 0 0 1 15 10';
+    $('previa').innerHTML=q(0,0,13,0)+q(13,0,8,1)+q(16,8,5,2)+q(13,10,3,3)+q(13,8,2,4)+q(15,8,1,4)+q(15,9,1,4)+
+      '<path d="'+arco+'" fill="none" stroke="#000" stroke-opacity=".35" stroke-width=".22" stroke-linecap="round"/>'+
+      '<path d="'+arco+'" fill="none" stroke="#fff" stroke-opacity=".9" stroke-width=".1" stroke-linecap="round"/>'+
+      tx(4.5,5.6,0,PCT[0]+'%',2.2)+tx(17,3.6,1,PCT[1]+'%',1.7)+tx(18.5,10.4,2,PCT[2]+'%',1.3)+tx(14.5,11.5,3,PCT[3]+'%',.85)+
+      '<rect x="13" y="8" width="3" height="2" fill="none" stroke="#000" stroke-opacity=".0"/>';
+    detalhe(PAL.sel);
+  }
+  function detalhe(i){
+    var sl=PAL.slots[i];if(!sl)return;
+    var c=hexTo(sl.hex),o=converter(c[0],c[1],c[2]);
+    $('pd-amo').style.background='#'+sl.hex;$('pd-nome').textContent=PCT[i]+'%, '+nomeCor(sl);
+    $('pd-hex').textContent=o.hex;$('pd-rgb').textContent=o.rgb;$('pd-web').textContent=o.web;
+    $('pd-hsb').textContent=o.hsb;$('pd-cmyk').textContent=o.cmyk;$('pd-pan').textContent=o.pan;
+  }
+  function mixHex(h,t,alvo){var c=hexTo(h);return c.map(function(v){return hex2(Math.round(v+(alvo-v)*t))}).join('')}
+  function abrirPicker(i){
+    PAL.aberto=i;PAL.sel=i;
+    $('pk-tit').textContent='Trocar a cor de '+PCT[i]+'%';
+    var g=$('pk-grid');g.innerHTML='';
+    var linhas=[[0,255],[.2,255],[.4,255],[.6,255],[.8,255],[.3,0],[.55,0]];
+    linhas.forEach(function(ln){
+      MATIZ.forEach(function(m,k){
+        var hx=ln[0]===0?m.h:mixHex(m.h,ln[0],ln[1]);
+        var b=document.createElement('button');b.type='button';b.style.background='#'+hx;b.setAttribute('aria-label',m.n+' '+hx);b.title=m.n+' #'+hx;
+        b.addEventListener('click',function(){PAL.slots[i]={hex:hx,idx:k,locked:true};$('picker').hidden=true;desenharPaleta()});
+        g.appendChild(b);
+      });
+    });
+    $('picker').hidden=false;desenharPaleta();
+    $('picker').scrollIntoView({block:'nearest',behavior:'smooth'});
+  }
+  $('pk-fechar').addEventListener('click',function(){$('picker').hidden=true});
+
+  var DISC2HARM={analogas:'analoga',complementares:'complementar',triadicas:'triadica','semi-complementar':'divida',monocromia:'monocromia'};
+  function usarComoBase(c){
+    var hex=hex2(c[0])+hex2(c[1])+hex2(c[2]);
+    var hsl=rgb2hsl(c[0],c[1],c[2]);
+    // matiz mais próxima do círculo
+    var best=0,bd=999;
+    MATIZ.forEach(function(m,k){
+      var h=rgb2hsl.apply(null,hexTo(m.h))[0],d=Math.abs(h-hsl[0]);d=Math.min(d,360-d);
+      if(d<bd){bd=d;best=k}
+    });
+    // harmonia do disco ligado que estiver mais à frente
+    for(var i=DISCOS.length-1;i>=0;i--){
+      var d=DISCOS[i];
+      if(d.on&&DISC2HARM[d.id]){PAL.harm=DISC2HARM[d.id];break;}
+    }
+    PAL.dom=best;PAL.base={h:hsl[0],s:hsl[1],l:hsl[2]};PAL.sel=0;
+    PAL.slots=PAL.slots.map(function(s){return s&&s.locked?s:null});
+    PAL.slots[0]={hex:hex.toUpperCase(),idx:best,locked:true};
+    gerarTudo();atmChips();desenharPaleta();
+    $('picker').hidden=true;
+  }
+  function atmChips(){
+    var a=PAL.atm;$('atm-desc').textContent=a.txt;
+    $('atm-chips').innerHTML='<span class="chip">Harmonia: '+HARM[PAL.harm].nome+'</span><span class="chip">Dominante: '+MATIZ[PAL.dom].n+'</span>'+(PAL.base?'<span class="chip">Base: #'+PAL.slots[0].hex+'</span>':'');
+    $('b-perfil').hidden=!PAL.base;
+  }
+  function novaAtmosfera(a){
+    PAL.atm=a;PAL.dom=a.dom[0];PAL.harm=a.harm[0];PAL.satOff=0;PAL.luzOff=0;PAL.sel=0;PAL.base=null;
+    $('sl-sat').value=0;$('sl-luz').value=0;$('o-sat').textContent='0';$('o-luz').textContent='0';
+    PAL.slots=PAL.slots.map(function(s){return s&&s.locked?s:null});
+    gerarTudo();atmChips();desenharPaleta();sincronizar();
+  }
+  var selAtm=$('atm');
+  ATM.forEach(function(a,i){var o=document.createElement('option');o.value=i;o.textContent=a.nome;selAtm.appendChild(o)});
+  selAtm.addEventListener('change',function(){$('picker').hidden=true;novaAtmosfera(ATM[+this.value])});
+  $('sl-sat').addEventListener('input',function(){PAL.satOff=+this.value;$('o-sat').textContent=(PAL.satOff>0?'+':'')+PAL.satOff;gerarTudo();desenharPaleta()});
+  $('sl-luz').addEventListener('input',function(){PAL.luzOff=+this.value;$('o-luz').textContent=(PAL.luzOff>0?'+':'')+PAL.luzOff;gerarTudo();desenharPaleta()});
+  $('b-sugerir').addEventListener('click',function(){
+    var a=PAL.atm,cand=a.dom.filter(function(d){return d!==PAL.dom});
+    // às vezes mantém a mesma dominante e muda só a harmonia
+    var hs=a.harm.filter(function(h){return h!==PAL.harm});
+    if(hs.length&&Math.random()<.5)PAL.harm=hs[Math.floor(Math.random()*hs.length)];
+    else if(!PAL.base)PAL.dom=cand[Math.floor(Math.random()*cand.length)];
+    if(!a.harm.length)return;
+    // varia a ordem de apoio e dá um pequeno ruído de tom (±1 casa) nas cores livres
+    PAL.slots=PAL.slots.map(function(s){return s&&s.locked?s:null});
+    gerarTudo();
+    PAL.slots.forEach(function(s,i){
+      if(!s||s.locked||i===0)return;
+      if(Math.random()<.5){
+        var idx=(s.idx+(Math.random()<.5?1:11))%12;
+        var base=rgb2hsl.apply(null,hexTo(MATIZ[idx].h)),old=rgb2hsl.apply(null,hexTo(s.hex));
+        s.hex=hsl2hex(base[0],clamp01(base[1]*a.sat+PAL.satOff/100),old[2]);s.idx=idx;
+      }
+    });
+    atmChips();desenharPaleta();sincronizar();
+  });
+  $('b-perfil').addEventListener('click',function(){
+    PAL.base=null;PAL.slots=PAL.slots.map(function(s){return s&&s.locked?s:null});gerarTudo();atmChips();desenharPaleta();
+  });
+  $('b-restaurar').addEventListener('click',function(){PAL.slots=[];$('picker').hidden=true;novaAtmosfera(PAL.atm)});
+
+  var HDISC={analoga:'analogas',complementar:'complementares',triadica:'triadicas',divida:'semi-complementar',monocromia:'monocromia'};
+  function sincronizar(){
+    if(!$('pal-sync').checked||!DISCOS[0].row)return;
+    var alvo=HDISC[PAL.harm];
+    DISCOS.forEach(function(d){
+      if(d.id==='cores')d.on=true;
+      else if(d.grupo==='harm')d.on=d.id===alvo;
+      if(d.id===alvo)d.ang=(PAL.dom*30)%360;
+    });
+    selId=alvo;refresh();
+  }
+  $('pal-sync').addEventListener('change',function(){if(this.checked)sincronizar()});
+  novaAtmosfera(ATM[0]);
+
+  listas();refresh();sincronizar();
+})();
+</script>
+
+</body>
+</html>
