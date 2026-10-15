@@ -45,6 +45,12 @@ h1{font-size:22px;font-weight:900;margin:0;letter-spacing:.2px;text-wrap:balance
 .disc[hidden]{display:none!important}
 .hint{font-size:12.5px;color:var(--ink-soft);margin:10px 2px 0;text-align:center}
 .panel{display:flex;flex-direction:column;gap:14px}
+.acc-h{all:unset;box-sizing:border-box;display:flex;align-items:center;justify-content:space-between;width:100%;cursor:pointer;font-size:13px;letter-spacing:.8px;text-transform:uppercase;color:var(--ink-soft);font-weight:900;font-family:var(--font)}
+.acc-h:focus-visible{outline:2px solid var(--focus);outline-offset:3px;border-radius:6px}
+.acc-h::after{content:"";width:8px;height:8px;border-right:2px solid currentColor;border-bottom:2px solid currentColor;transform:rotate(45deg);margin:-4px 4px 0 0;transition:transform .15s;flex:none}
+.acc-h[aria-expanded="true"]::after{transform:rotate(-135deg);margin:4px 4px 0 0}
+.acc-b{margin-top:10px}
+.acc-b[hidden]{display:none}
 h2{font-size:13px;letter-spacing:.8px;text-transform:uppercase;color:var(--ink-soft);margin:0 0 8px;font-weight:900}
 .group{display:flex;flex-direction:column;gap:6px}
 .row{display:flex;align-items:center;gap:10px;padding:8px 10px;border:1px solid var(--line);border-radius:9px;background:var(--card);cursor:pointer;min-width:0}
@@ -825,6 +831,23 @@ input[type=range]{flex:1;min-width:120px;accent-color:var(--petrol)}
   listas();refresh();sincronizar();
 })();
 </script>
+<script>
+(function(){
+  var abertos={'paleta':1};
+  document.querySelectorAll('.panel > .card').forEach(function(card,i){
+    var h=card.querySelector(':scope > h2'); if(!h) return;
+    var corpo=document.createElement('div'); corpo.className='acc-b'; corpo.id='acc-b'+i;
+    while(h.nextSibling) corpo.appendChild(h.nextSibling);
+    var b=document.createElement('button'); b.type='button'; b.className='acc-h';
+    b.textContent=h.textContent; b.setAttribute('aria-controls',corpo.id);
+    var ab=card.classList.contains('paleta');
+    b.setAttribute('aria-expanded',ab?'true':'false'); corpo.hidden=!ab;
+    b.addEventListener('click',function(){var o=b.getAttribute('aria-expanded')==='true';b.setAttribute('aria-expanded',o?'false':'true');corpo.hidden=o;});
+    h.replaceWith(b); card.appendChild(corpo);
+  });
+})();
+</script>
+
 
 </body>
 </html>
