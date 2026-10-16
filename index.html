@@ -51,6 +51,19 @@ h1{font-size:22px;font-weight:900;margin:0;letter-spacing:.2px;text-wrap:balance
 .acc-h[aria-expanded="true"]::after{transform:rotate(-135deg);margin:4px 4px 0 0}
 .acc-b{margin-top:10px}
 .acc-b[hidden]{display:none}
+.exp .ex-h{font-size:13px;margin:14px 0 6px;font-weight:900}
+.ex-txt{width:100%;margin-top:10px;font:12px/1.5 ui-monospace,Consolas,monospace;border:1px solid var(--line);border-radius:8px;padding:8px;background:var(--card);color:var(--ink);resize:vertical}
+.ct-tab{display:flex;flex-direction:column;gap:6px}
+.ct-lin{display:flex;align-items:center;gap:8px;font-size:12px;flex-wrap:wrap}
+.ct-lin i{width:26px;height:26px;border-radius:7px;border:1px solid var(--line);flex:none}
+.ct-lin b{min-width:62px}
+.ct-chip{display:inline-flex;align-items:center;gap:6px;padding:3px 9px;border-radius:99px;font-weight:700;border:1px solid var(--line)}
+.ct-chip.ok{background:#e3f4e7;color:#14532d;border-color:#b6dfc0}
+.ct-chip.med{background:#fff4d6;color:#7a4b00;border-color:#f0d58a}
+.ct-chip.no{background:#fde4e4;color:#8a1c1c;border-color:#f1b5b5}
+.ct-par{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.ct-par label{font-size:12px;font-weight:700;color:var(--ink-soft);display:flex;flex-direction:column;gap:4px}
+.ct-amo{margin-top:8px;padding:16px;border-radius:10px;border:1px solid var(--line);font-weight:900;font-size:20px;text-align:center}
 h2{font-size:13px;letter-spacing:.8px;text-transform:uppercase;color:var(--ink-soft);margin:0 0 8px;font-weight:900}
 .group{display:flex;flex-direction:column;gap:6px}
 .row{display:flex;align-items:center;gap:10px;padding:8px 10px;border:1px solid var(--line);border-radius:9px;background:var(--card);cursor:pointer;min-width:0}
@@ -207,6 +220,28 @@ input[type=range]{flex:1;min-width:120px;accent-color:var(--petrol)}
           <svg class="previa" id="previa" viewBox="0 0 21 13" role="img" aria-label="Retângulo de Fibonacci com espiral, preenchido com as cinco cores da paleta" style="margin-top:12px"></svg>
         </div>
 
+        <div class="card exp">
+          <h2>Exportar e contraste</h2>
+          <p class="atm-desc" style="margin-top:0">Leva a paleta para outros programas e testa se o texto fica legível sobre cada cor.</p>
+          <div style="display:flex;flex-wrap:wrap;gap:8px">
+            <button class="btn" id="ex-hex">Copiar HEX</button>
+            <button class="btn" id="ex-css">Copiar CSS</button>
+            <button class="btn" id="ex-png">Baixar PNG</button>
+          </div>
+          <textarea id="ex-txt" class="ex-txt" readonly rows="6" aria-label="Texto exportado" hidden></textarea>
+          <p class="atm-desc" id="ex-msg" role="status" aria-live="polite" style="min-height:1.2em"></p>
+          <h3 class="ex-h">Contraste do texto (WCAG)</h3>
+          <div class="ct-tab" id="ct-tab"></div>
+          <p class="atm-desc">Quanto maior o número, mais legível. AAA (7:1 ou mais) é excelente, AA (4,5:1 ou mais) é o mínimo para texto normal, "só texto grande" (3:1 a 4,4:1) serve para títulos, e "reprovado" (menos de 3:1) cansa a leitura.</p>
+          <h3 class="ex-h">Testar um par</h3>
+          <div class="ct-par">
+            <label>Texto <select id="ct-t" class="sel-atm"></select></label>
+            <label>Fundo <select id="ct-f" class="sel-atm"></select></label>
+          </div>
+          <div class="ct-amo" id="ct-amo">Aa Texto de exemplo</div>
+          <p class="atm-desc" id="ct-res"></p>
+        </div>
+
         <div class="card ctl">
           <h2>Disco selecionado</h2>
           <div class="linha"><b id="ct-nome" style="font-size:15px">Nenhum</b></div>
@@ -351,9 +386,21 @@ input[type=range]{flex:1;min-width:120px;accent-color:var(--petrol)}
         <figure><img src="ajuda/clique.png" alt="Clique em uma cor rosa no círculo gerando uma paleta análoga no painel" loading="lazy"><figcaption>Do clique à paleta.</figcaption></figure>
       </div>
 
-      <div class="passo">
+      <div class="passo" style="align-items:start">
         <div>
-          <h3><span class="np">8</span>Atalhos</h3>
+          <h3><span class="np">8</span>Exporte a paleta e teste o contraste</h3>
+          <p>Na aba "Exportar e contraste" você leva a paleta para outros programas: "Copiar HEX" copia os códigos, "Copiar CSS" copia variáveis prontas para sites e "Baixar PNG" gera uma imagem da paleta.</p>
+          <p>O contraste mostra se um texto fica legível sobre uma cor. O número, como 5,8:1, diz quantas vezes a cor mais clara é mais luminosa que a mais escura. Vai de 1:1 (cores iguais, texto invisível) até 21:1 (preto sobre branco).</p>
+          <ul>
+            <li><b>AAA</b> (7:1 ou mais): leitura excelente.</li>
+            <li><b>AA</b> (4,5:1 ou mais): bom para texto normal, é o mínimo recomendado.</li>
+            <li><b>Só texto grande</b> (3:1 a 4,4:1): serve para títulos e letras grandes, não para parágrafos.</li>
+            <li><b>Reprovado</b> (menos de 3:1): a leitura cansa ou falha, escolha outro par.</li>
+          </ul>
+          <p>Use "Testar um par" para escolher a cor do texto e a do fundo e ver uma amostra. Esses critérios vêm das diretrizes de acessibilidade WCAG e valem também para cartazes e capas.</p>
+        </div>
+        <div>
+          <h3><span class="np">9</span>Atalhos</h3>
           <ul>
             <li>"Só a base" deixa apenas o disco Cores ligado.</li>
             <li>"Ligar todos" e "Desligar todos" liga ou desliga tudo de uma vez.</li>
@@ -361,12 +408,15 @@ input[type=range]{flex:1;min-width:120px;accent-color:var(--petrol)}
             <li>Setas do teclado giram o disco selecionado, e Shift muda o passo para 1°.</li>
           </ul>
         </div>
+      </div>
+      <div class="passo" style="grid-template-columns:minmax(0,1fr)">
         <div>
-          <h3><span class="np">9</span>Ideias de exercício</h3>
+          <h3><span class="np">10</span>Ideias de exercício</h3>
           <ul>
             <li><b>Luz e sombra:</b> ligue o Transparente cinza e ordene as cores do mais claro ao mais escuro.</li>
             <li><b>Forma e proporção:</b> use os 53%, 21%, 13%, 8% e 5% como regra de área numa composição de cinco partes.</li>
             <li><b>Perspectiva e espaço:</b> use "Cores frias" para o fundo e "Cores quentes" para a frente de uma paisagem.</li>
+            <li><b>Linha e gesto:</b> escolha dois pares da paleta, um com bom contraste e outro reprovado, e rabisque uma frase com cada um para sentir a diferença de leitura.</li>
             <li><b>Materiais e superfícies:</b> misture a paleta em aquarela ou pastel e compare com a leitura do espectrofotômetro.</li>
           </ul>
         </div>
@@ -724,7 +774,77 @@ input[type=range]{flex:1;min-width:120px;accent-color:var(--petrol)}
       '<path d="'+arco+'" fill="none" stroke="#fff" stroke-opacity=".9" stroke-width=".1" stroke-linecap="round"/>'+
       tx(4.5,5.6,0,PCT[0]+'%',2.2)+tx(17,3.6,1,PCT[1]+'%',1.7)+tx(18.5,10.4,2,PCT[2]+'%',1.3)+tx(14.5,11.5,3,PCT[3]+'%',.85)+
       '<rect x="13" y="8" width="3" height="2" fill="none" stroke="#000" stroke-opacity=".0"/>';
+    atualizarExtras();
     detalhe(PAL.sel);
+  }
+  function ratio(a,b){var x=lumin(a),y=lumin(b),h=Math.max(x,y),l=Math.min(x,y);return (h+.05)/(l+.05)}
+  function chipC(r){
+    var t=r>=7?['ok','AAA']:r>=4.5?['ok','AA']:r>=3?['med','só texto grande']:['no','reprovado'];
+    return '<span class="ct-chip '+t[0]+'">'+r.toFixed(1).replace('.',',')+':1 '+t[1]+'</span>';
+  }
+  function opcoesCor(){
+    var o=PAL.slots.map(function(sl,i){return [sl.hex,PCT[i]+'% '+nomeCor(sl)]});
+    o.push(['FFFFFF','Branco']);o.push(['000000','Preto']);return o;
+  }
+  var ctT=0,ctF=1;
+  function atualizarExtras(){
+    if(!$('ct-tab'))return;
+    var h='';
+    PAL.slots.forEach(function(sl,i){
+      h+='<div class="ct-lin"><i style="background:#'+sl.hex+'"></i><b>'+PCT[i]+'% #'+sl.hex+'</b>'+
+        '<span>Branco '+chipC(ratio(sl.hex,'FFFFFF'))+'</span><span>Preto '+chipC(ratio(sl.hex,'000000'))+'</span></div>';
+    });
+    $('ct-tab').innerHTML=h;
+    var op=opcoesCor();
+    ['ct-t','ct-f'].forEach(function(id,n){
+      var se=$(id),v=n?ctF:ctT;se.innerHTML='';
+      op.forEach(function(x,i){var e=document.createElement('option');e.value=i;e.textContent=x[1];se.appendChild(e)});
+      se.value=v;
+    });
+    par();
+  }
+  function par(){
+    var op=opcoesCor(),t=op[+$('ct-t').value][0],f=op[+$('ct-f').value][0];
+    ctT=+$('ct-t').value;ctF=+$('ct-f').value;
+    $('ct-amo').style.background='#'+f;$('ct-amo').style.color='#'+t;
+    $('ct-res').innerHTML='Razão de contraste '+chipC(ratio(t,f))+' (AA pede 4,5:1 para texto normal e 3:1 para texto grande).';
+  }
+  function msg(t){$('ex-msg').textContent=t}
+  function copiar(txt,ok){
+    var ta=$('ex-txt');ta.value=txt;ta.hidden=false;
+    function fallback(){ta.focus();ta.select();var r=false;try{r=document.execCommand('copy')}catch(e){}msg(r?ok:'Selecionei o texto acima, use Ctrl+C para copiar.')}
+    if(navigator.clipboard&&navigator.clipboard.writeText){navigator.clipboard.writeText(txt).then(function(){msg(ok)},fallback)}else fallback();
+  }
+  function baixarPNG(){
+    var W=1400,H=720,c=document.createElement('canvas');c.width=W;c.height=H;var g=c.getContext('2d');
+    g.fillStyle='#fff';g.fillRect(0,0,W,H);
+    g.fillStyle='#23272b';g.font='bold 34px Lato,Arial,sans-serif';g.textBaseline='alphabetic';
+    g.fillText('Paleta '+PAL.atm.nome+' · proporção de Fibonacci',40,60);
+    var x=40,tot=PCT.reduce(function(a,b){return a+b},0),w=W-80;
+    PAL.slots.forEach(function(sl,i){
+      var bw=Math.round(w*PCT[i]/tot);if(i===4)bw=40+w-x;
+      g.fillStyle='#'+sl.hex;g.fillRect(x,90,bw,500);
+      g.fillStyle=tinta(sl.hex);g.font='bold '+(bw<110?22:40)+'px Lato,Arial,sans-serif';g.fillText(PCT[i]+'%',x+(bw<110?8:16),150);
+      g.font='bold 22px Lato,Arial,sans-serif';
+      if(bw>150){g.fillText('#'+sl.hex,x+16,560);}
+      x+=bw;
+    });
+    g.fillStyle='#5b6670';g.font='20px Lato,Arial,sans-serif';
+    g.fillText(PAL.slots.map(function(sl){return '#'+sl.hex}).join('   '),40,640);
+    g.fillText('Círculo Cromático Interativo',40,685);
+    c.toBlob(function(b){
+      var a=document.createElement('a');a.href=URL.createObjectURL(b);a.download='paleta-'+PAL.atm.id+'.png';
+      document.body.appendChild(a);a.click();a.remove();setTimeout(function(){URL.revokeObjectURL(a.href)},2000);msg('PNG gerado.');
+    });
+  }
+  function ligarExtras(){
+    if(!$('ex-hex'))return;
+    $('ex-hex').addEventListener('click',function(){copiar(PAL.slots.map(function(sl){return '#'+sl.hex}).join('\n'),'HEX copiados.')});
+    $('ex-css').addEventListener('click',function(){
+      copiar(':root{\n'+PAL.slots.map(function(sl,i){return '  --cor-'+(i+1)+': #'+sl.hex+'; /* '+PCT[i]+'% '+nomeCor(sl)+' */'}).join('\n')+'\n}','CSS copiado.');
+    });
+    $('ex-png').addEventListener('click',baixarPNG);
+    $('ct-t').addEventListener('change',par);$('ct-f').addEventListener('change',par);
   }
   function detalhe(i){
     var sl=PAL.slots[i];if(!sl)return;
@@ -782,7 +902,7 @@ input[type=range]{flex:1;min-width:120px;accent-color:var(--petrol)}
     PAL.atm=a;PAL.dom=a.dom[0];PAL.harm=a.harm[0];PAL.satOff=0;PAL.luzOff=0;PAL.sel=0;PAL.base=null;
     $('sl-sat').value=0;$('sl-luz').value=0;$('o-sat').textContent='0';$('o-luz').textContent='0';
     PAL.slots=PAL.slots.map(function(s){return s&&s.locked?s:null});
-    gerarTudo();atmChips();desenharPaleta();sincronizar();
+    ligarExtras();gerarTudo();atmChips();desenharPaleta();sincronizar();
   }
   var selAtm=$('atm');
   ATM.forEach(function(a,i){var o=document.createElement('option');o.value=i;o.textContent=a.nome;selAtm.appendChild(o)});
